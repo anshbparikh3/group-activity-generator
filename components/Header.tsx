@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface HeaderProps {
   location: { city: string; lat: number; lon: number } | null
@@ -8,6 +8,12 @@ interface HeaderProps {
 export default function Header({ location, onUpdateLocation }: HeaderProps) {
   const [showZipInput, setShowZipInput] = useState(!location)
   const [zipCode, setZipCode] = useState('')
+
+  useEffect(() => {
+    if (location) {
+      setShowZipInput(false)
+    }
+  }, [location])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -19,37 +25,39 @@ export default function Header({ location, onUpdateLocation }: HeaderProps) {
   }
 
   return (
-    <header className="mb-8 bg-white rounded-lg shadow-lg p-6">
-      <h1 className="text-4xl font-bold mb-2 text-gray-800">🎉 Group Activity Generator</h1>
-      <p className="text-gray-600 mb-4">Find the perfect activity that everyone will love!</p>
+    <header className="mb-8 bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-2xl shadow-2xl p-6">
+      <h1 className="text-4xl font-extrabold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 tracking-tight">
+        Group Activity Generator
+      </h1>
+      <p className="text-slate-400 mb-6 font-medium">Optimize your group's social coordination.</p>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         {location && !showZipInput ? (
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <span className="text-2xl">📍</span>
               <div>
-                <p className="text-gray-600 text-sm">Current Location</p>
-                <p className="text-xl font-semibold text-gray-800">{location.city}</p>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Current Location</p>
+                <p className="text-xl font-bold text-slate-100">{location.city}</p>
               </div>
             </div>
           </div>
         ) : (
-          <p className="text-gray-600">Location not set</p>
+          <p className="text-slate-500 font-medium">Awaiting location parameters...</p>
         )}
 
         {showZipInput && (
-          <form onSubmit={handleSubmit} className="flex gap-2 flex-1 ml-4">
+          <form onSubmit={handleSubmit} className="flex gap-3 flex-1 sm:ml-4">
             <input
               type="text"
               placeholder="Enter zip code..."
               value={zipCode}
               onChange={(e) => setZipCode(e.target.value)}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-4 py-2 bg-slate-950 border border-slate-800 rounded-lg text-slate-100 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 placeholder-slate-600 transition-all shadow-inner"
             />
             <button
               type="submit"
-              className="px-6 py-2 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 transition-colors"
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.3)] transition-all"
             >
               Set Location
             </button>
@@ -59,9 +67,9 @@ export default function Header({ location, onUpdateLocation }: HeaderProps) {
         {location && !showZipInput && (
           <button
             onClick={() => setShowZipInput(true)}
-            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+            className="px-5 py-2 bg-slate-800 text-slate-300 border border-slate-700 rounded-lg font-semibold hover:bg-slate-700 hover:text-white transition-all"
           >
-            Change Location
+            Update
           </button>
         )}
       </div>

@@ -5,18 +5,24 @@ import Header from '@/components/Header'
 import FriendForm from '@/components/FriendForm'
 import Results from '@/components/Results'
 import LoadingState from '@/components/LoadingState'
+import { Friend, Activity, POI } from './type'
 
-export interface Friend {
-  id: string
-  name: string
-  interests: string
+interface OverpassElement {
+  tags?: {
+    name?: string;
+    amenity?: string;
+    leisure?: string;
+    shop?: string;
+  };
+  lat?: number;
+  lon?: number;
 }
 
-export interface Activity {
-  title: string
-  description: string
-  vibe: string
-  isWildcard?: boolean
+interface GroqActivityResponse {
+  poiId?: number;
+  title: string;
+  description: string;
+  vibe: string;
 }
 
 export default function Home() {
@@ -26,7 +32,6 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Initialize location on mount
   useEffect(() => {
     const getLocationFromBrowser = () => {
       if ('geolocation' in navigator) {
@@ -51,7 +56,10 @@ export default function Home() {
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
       )
       const data = await response.json()
-      const city = data.address.city || data.address.town || data.address.county || 'Unknown Location'
+      const address = data.address || {}
+      const cityBase = address.city || address.town || address.village || address.county || 'Unknown Location'
+      const stateCode = address['ISO3166-2-lvl4']?.split('-')[1] || address.state || ''
+      const city = stateCode ? `${cityBase}, ${stateCode}` : cityBase
       setLocation({ city, lat, lon })
     } catch (err) {
       console.error('Reverse geocoding failed:', err)
@@ -60,14 +68,15 @@ export default function Home() {
 
   const handleZipCodeSubmit = async (zipCode: string) => {
     try {
-      // Use a free geocoding service to convert zip code to coordinates
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&postalcode=${zipCode}&countrycodes=us`
+        `https://nominatim.openstreetmap.org/search?format=json&postalcode=${zipCode}&countrycodes=us&addressdetails=1`
       )
       const data = await response.json()
       if (data.length > 0) {
-        const { lat, lon, address } = data[0]
-        const city = address.city || address.town || address.county || zipCode
+        const { lat, lon, address, name } = data[0]
+        const cityBase = address?.city || address?.town || address?.village || address?.county || name || zipCode
+        const stateCode = address?.['ISO3166-2-lvl4']?.split('-')[1] || address?.state || ''
+        const city = stateCode ? `${cityBase}, ${stateCode}` : cityBase
         setLocation({ city, lat: parseFloat(lat), lon: parseFloat(lon) })
         setError(null)
       } else {
@@ -79,17 +88,9 @@ export default function Home() {
     }
   }
 
-  const addFriend = (friend: Friend) => {
-    setFriends([...friends, friend])
-  }
-
-  const updateFriend = (id: string, updated: Friend) => {
-    setFriends(friends.map((f) => (f.id === id ? updated : f)))
-  }
-
-  const removeFriend = (id: string) => {
-    setFriends(friends.filter((f) => f.id !== id))
-  }
+  const addFriend = (friend: Friend) => setFriends([...friends, friend])
+  const updateFriend = (id: string, updated: Friend) => setFriends(friends.map((f) => (f.id === id ? updated : f)))
+  const removeFriend = (id: string) => setFriends(friends.filter((f) => f.id !== id))
 
   const generateActivities = async () => {
     if (!location || friends.length === 0) {
@@ -100,12 +101,8 @@ export default function Home() {
     setLoading(true)
     setError(null)
     try {
-      // Fetch nearby POIs using Overpass API
       const pois = await fetchNearbyPOIs(location.lat, location.lon)
-
-      // Send to Groq API for processing
       const groqResponse = await callGroqAPI(pois, friends, location.city)
-
       setActivities(groqResponse)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate activities')
@@ -115,108 +112,87 @@ export default function Home() {
     }
   }
 
-  const fetchNearbyPOIs = async (lat: number, lon: number): Promise<string[]> => {
+  const fetchNearbyPOIs = async (lat: number, lon: number): Promise<POI[]> => {
     try {
-      // Using Overpass API to fetch nearby POIs (restaurants, cafes, parks, museums, etc.)
       const overpassQuery = `
         [out:json];
         (
-          node[amenity=cafe](around:2000,${lat},${lon});
-          node[amenity=restaurant](around:2000,${lat},${lon});
-          node[leisure=park](around:2000,${lat},${lon});
-          node[amenity=museum](around:2000,${lat},${lon});
-          node[amenity=bar](around:2000,${lat},${lon});
-          node[shop=books](around:2000,${lat},${lon});
-          node[amenity=cinema](around:2000,${lat},${lon});
-          node[amenity=gym](around:2000,${lat},${lon});
-          node[tourism=museum](around:2000,${lat},${lon});
+          node[amenity=cafe](around:8000,${lat},${lon});
+          node[amenity=restaurant](around:8000,${lat},${lon});
+          node[leisure=park](around:8000,${lat},${lon});
+          node[amenity=museum](around:8000,${lat},${lon});
+          node[amenity=bar](around:8000,${lat},${lon});
+          node[shop=books](around:8000,${lat},${lon});
+          node[amenity=cinema](around:8000,${lat},${lon});
+          node[amenity=gym](around:8000,${lat},${lon});
+          node[leisure=bowling_alley](around:8000,${lat},${lon});
+          node[leisure=sports_centre](around:8000,${lat},${lon});
         );
         out body;
       `
-
       const response = await fetch('https://overpass-api.de/api/interpreter', {
         method: 'POST',
         body: overpassQuery,
       })
-
       const data = await response.json()
-      const pois = data.elements
-        .filter((element: any) => element.tags && element.tags.name)
-        .map((element: any) => {
-          const type = element.tags.amenity || element.tags.leisure || element.tags.shop || element.tags.tourism || 'venue'
-          return `${element.tags.name} (${type})`
-        })
-        .slice(0, 30) // Limit to top 30 POIs
-
+      const pois: POI[] = data.elements
+        .filter((element: OverpassElement) => element.tags && element.tags.name && element.lat && element.lon)
+        .map((element: OverpassElement) => ({
+          name: element.tags!.name!,
+          type: element.tags!.amenity || element.tags!.leisure || element.tags!.shop || 'venue',
+          lat: element.lat!,
+          lon: element.lon!
+        }))
+        .filter((poi: POI, index: number, self: POI[]) => index === self.findIndex((t) => t.name === poi.name))
+        .slice(0, 30)
       return pois
     } catch (err) {
       console.error('Failed to fetch POIs:', err)
-      return [] // Return empty if Overpass fails
+      return []
     }
   }
 
-  const callGroqAPI = async (pois: string[], friends: Friend[], city: string): Promise<Activity[]> => {
+  const callGroqAPI = async (pois: POI[], friends: Friend[], city: string): Promise<Activity[]> => {
     const apiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY
 
     if (!apiKey || apiKey === 'your_groq_api_key_here') {
-      // Placeholder response if API key not set
-      console.warn('Groq API key not configured. Using placeholder response.')
       return [
         {
-          title: 'Coffee Tasting at Local Café',
+          title: 'Local Café: Coffee Tasting',
           description: 'Explore artisanal coffee and pastries while chatting with friends',
           vibe: 'Chill',
-        },
-        {
-          title: 'Park Picnic & Games',
-          description: 'Pack some snacks and enjoy lawn games in a beautiful park setting',
-          vibe: 'Relaxed & Social',
-        },
-        {
-          title: 'Food Truck Tour',
-          description: 'Visit multiple food trucks and sample different cuisines together',
-          vibe: 'High Energy',
-        },
-        {
-          title: 'Sunset Rooftop Bar Hopping',
-          description: 'Hit up local rooftop bars for drinks and views (Wildcard pick!)',
-          vibe: 'Fun & Unexpected',
-          isWildcard: true,
-        },
+          mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(city)}`
+        }
       ]
     }
 
-    const friendsText = friends
-      .map(
-        (f) =>
-          `${f.name}: ${f.interests}`
-      )
-      .join('\n')
-
-    const poisText = pois.join(', ')
+    const friendsText = friends.map((f) => `${f.name}:\n  Likes: ${f.likes}\n  Dislikes: ${f.dislikes || 'None'}`).join('\n\n')
+    const poisText = pois.map((poi, index) => `[ID: ${index}] ${poi.name} (${poi.type})`).join('\n')
 
     const prompt = `You are a local expert and social coordinator in ${city}. Here are 2-5 friends and their interests:
 
 ${friendsText}
 
-Here are nearby venues in the area:
+Here are specific nearby venues in the area:
 ${poisText}
 
-Your goal is to return ONLY a valid JSON object (no markdown, no extra text) with exactly 4 recommendations: 3 based on group consensus and 1 'Wildcard' recommendation that is unexpected but fun. The JSON format must be:
+Your goal is to return ONLY a valid JSON object with exactly 4 recommendations: 3 based on group consensus and 1 'Wildcard' recommendation that is unexpected but fun.
+
+CRITICAL INSTRUCTION: You MUST select specific venues from the 'nearby venues' list provided above. Use the exact ID of the venue you selected. Do not make up venues.
+
+The JSON format must be exactly:
 {
   "activities": [
     {
-      "title": "Activity Title",
-      "description": "Why this works for the group",
+      "poiId": <Number from the ID field of the selected venue>,
+      "title": "Short Activity Name",
+      "description": "Explain what you will do at this specific venue and why it satisfies the group's interests.",
       "vibe": "Vibe tag (e.g., Chill, High Energy, Social, Adventurous)"
-    },
-    ...
+    }
   ]
 }
 
-The last activity should have "vibe": "Wildcard" to indicate it's the unexpected one.
-
-Return ONLY the JSON object, nothing else.`
+The last activity should have "vibe": "Wildcard". Return ONLY the JSON object, nothing else.`
 
     try {
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -226,43 +202,50 @@ Return ONLY the JSON object, nothing else.`
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: 'mixtral-8x7b-32768', // or another available model
+          model: 'llama-3.1-8b-instant',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.7,
           max_tokens: 1024,
+          response_format: { type: 'json_object' }
         }),
       })
 
       if (!response.ok) {
-        throw new Error(`Groq API error: ${response.statusText}`)
+        const errorData = await response.json().catch(() => ({})) as { error?: { message?: string } };
+        throw new Error(errorData?.error?.message || `HTTP Error ${response.status}`);
       }
 
       const data = await response.json()
       const content = data.choices[0].message.content
+      const parsedResponse = JSON.parse(content) as { activities: GroqActivityResponse[] }
 
-      // Parse JSON from response
-      const jsonMatch = content.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) {
-        throw new Error('Invalid response format from AI')
-      }
+      return parsedResponse.activities.map((activity, index) => {
+        const poi = typeof activity.poiId === 'number' ? pois[activity.poiId] : null;
+        
+        const mapsUrl = poi 
+  ? `https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lon}`
+  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((activity.title || 'Activity') + ' near ' + city)}`;
 
-      const parsedResponse = JSON.parse(jsonMatch[0])
-      return parsedResponse.activities.map((activity: any, index: number) => ({
-        ...activity,
-        isWildcard: index === parsedResponse.activities.length - 1,
-      }))
+        return {
+          title: poi ? `${poi.name}: ${activity.title}` : activity.title,
+          description: activity.description,
+          vibe: activity.vibe,
+          isWildcard: index === parsedResponse.activities.length - 1,
+          mapsUrl: mapsUrl
+        }
+      })
     } catch (err) {
-      throw new Error(`Failed to generate activities: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      throw new Error(`${err instanceof Error ? err.message : 'Unknown error'}`)
     }
   }
 
   return (
-    <main className="min-h-screen py-8 px-4">
+    <main className="min-h-screen py-10 px-4 text-slate-200 selection:bg-blue-500/30">
       <div className="max-w-4xl mx-auto">
         <Header location={location} onUpdateLocation={handleZipCodeSubmit} />
 
         {error && (
-          <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+          <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl font-medium shadow-inner">
             {error}
           </div>
         )}
@@ -282,7 +265,7 @@ Return ONLY the JSON object, nothing else.`
             <button
               onClick={generateActivities}
               disabled={!location || friends.length === 0}
-              className="w-full mt-8 py-4 px-6 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-bold text-lg hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="w-full mt-6 py-4 px-6 bg-blue-600 text-white rounded-xl font-extrabold text-lg tracking-wide hover:bg-blue-500 shadow-[0_0_20px_rgba(37,99,235,0.4)] disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed transition-all"
             >
               Generate Activities
             </button>
