@@ -2,12 +2,5 @@
   "buildCommand": "next build",
   "outputDirectory": ".next",
   "devCommand": "next dev --port $PORT",
-  "framework": "nextjs",
-  "regions": ["sfo1"],
-  "functions": {
-    "api/**": {
-      "memory": 1024,
-      "maxDuration": 60
-    }
-  }
+  "framework": "nextjs"
 }
