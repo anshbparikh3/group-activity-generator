@@ -1,13 +1,9 @@
 export default function LoadingState() {
   return (
-    <div className="flex flex-col items-center justify-center py-16">
-      <div className="relative w-16 h-16 mb-6">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full animate-spin opacity-20"></div>
-        <div className="absolute inset-2 bg-white rounded-full"></div>
-        <div className="absolute inset-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full animate-pulse"></div>
-      </div>
-      <p className="text-lg font-semibold text-gray-800 mb-2">Finding perfect activities...</p>
-      <p className="text-gray-600">Analyzing your group&apos;s interests and local venues</p>
+    <div className="flex flex-col items-center justify-center py-24 bg-white border border-zinc-200">
+      <div className="w-12 h-12 mb-8 border-[3px] border-zinc-100 border-t-beige animate-spin"></div>
+      <p className="text-xl font-poppins font-bold text-emerald-950 mb-3 tracking-tight">Generating Results</p>
+      <p className="text-zinc-500 font-source-sans text-lg">Analyzing your group's interests and nearby places</p>
     </div>
   )
 }

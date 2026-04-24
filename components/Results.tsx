@@ -6,71 +6,68 @@ interface ResultsProps {
 
 export default function Results({ activities }: ResultsProps) {
   return (
-    <div className="space-y-6">
-      <div className="text-center mb-10">
-        <h2 className="text-3xl font-extrabold text-slate-100 mb-2 tracking-tight">✨ Recommended Output</h2>
-        <p className="text-slate-400 font-medium">Optimized for your group's parameters</p>
+    <div className="space-y-8">
+      <div className="mb-10 border-b border-emerald-800/50 pb-8">
+        <h2 className="text-4xl font-poppins font-extrabold text-beige mb-3 tracking-tighter">Recommended Activities</h2>
+        <p className="text-zinc-300 font-source-sans text-lg">These results optimize your group’s interests</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 gap-8">
         {activities.map((activity, index) => {
-          // FIXED: Safe fallback map URL
-          const safeMapsUrl = activity.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.title)}`
+          const safeMapsUrl = activity.mapsUrl || `https://maps.google.com/?q=${encodeURIComponent(activity.title)}`
 
           return (
             <div
               key={index}
-              className={`relative p-7 rounded-2xl backdrop-blur-xl border transition-all hover:-translate-y-1 hover:shadow-2xl ${
+              className={`relative p-10 border transition-all ${
                 activity.isWildcard
-                  ? 'bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border-indigo-500/50 shadow-[0_0_30px_rgba(99,102,241,0.15)]'
-                  : 'bg-slate-900/50 border-slate-800'
+                  // Uses the exact compiled HEX color so it stays light and solid!
+                  ? 'bg-[#e6edeb] border-emerald-900/20 text-emerald-950'
+                  : 'bg-white border-zinc-200 text-emerald-950 hover:border-zinc-400'
               }`}
             >
-              <div className="absolute -top-3 -right-3">
+              <div className="mb-6">
                 <span
-                  className={`inline-block px-4 py-1 rounded-full text-xs font-bold tracking-wider uppercase shadow-lg ${
+                  className={`inline-block px-4 py-1 font-poppins text-xs font-bold tracking-widest uppercase border ${
                     activity.isWildcard
-                      ? 'bg-indigo-500 border border-indigo-400 text-white shadow-[0_0_15px_rgba(99,102,241,0.5)]'
-                      : 'bg-slate-800 text-slate-300 border border-slate-700'
+                      ? 'bg-emerald-950 text-beige border-emerald-950'
+                      : 'bg-emerald-900/10 text-emerald-950 border-emerald-900/20'
                   }`}
                 >
-                  {activity.isWildcard ? '🎲 Wildcard' : `Option ${index + 1}`}
+                  {activity.isWildcard ? 'Try Something Unique' : `Option ${index + 1}`}
                 </span>
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5 mb-4 pr-20">
-                <h3 className="text-2xl font-bold text-slate-100">{activity.title}</h3>
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 mb-6">
+                <h3 className="text-3xl font-poppins font-bold tracking-tight text-emerald-950">
+                  {activity.title}
+                </h3>
                 <a
                   href={safeMapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center flex-shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-all bg-slate-800 text-blue-400 border border-slate-700 hover:bg-slate-700 hover:text-blue-300"
+                  className={`inline-flex items-center flex-shrink-0 px-6 py-3 font-poppins text-xs font-bold uppercase tracking-widest transition-colors border ${
+                    activity.isWildcard
+                      ? 'bg-emerald-950 text-beige border-emerald-950 hover:bg-emerald-900'
+                      : 'bg-white text-emerald-950 border-zinc-300 hover:bg-emerald-900/10'
+                  }`}
                 >
-                  📍 Open Maps
+                  Open in Google Maps
                 </a>
               </div>
 
-              <p className="mb-6 text-lg leading-relaxed text-slate-300">
+              <p className={`text-lg leading-relaxed font-source-sans ${activity.isWildcard ? 'text-emerald-900' : 'text-zinc-600'}`}>
                 {activity.description}
               </p>
-
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Vibe Tag
-                </span>
-                <span className="inline-block px-3 py-1 rounded-md text-sm font-semibold bg-slate-950 border border-slate-800 text-blue-400">
-                  {activity.vibe}
-                </span>
-              </div>
             </div>
           )
         })}
       </div>
 
-      <div className="flex gap-4 mt-10">
+      <div className="flex gap-4 mt-12">
         <button
           onClick={() => window.location.reload()}
-          className="flex-1 py-4 px-6 bg-slate-800 text-slate-200 border border-slate-700 rounded-xl font-bold text-lg hover:bg-slate-700 hover:text-white transition-all shadow-lg"
+          className="flex-1 py-5 px-6 bg-beige text-emerald-950 font-poppins font-bold uppercase tracking-widest text-sm hover:bg-beige-dark transition-colors"
         >
           Reset Session
         </button>

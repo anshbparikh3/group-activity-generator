@@ -18,11 +18,11 @@ interface OverpassElement {
   lon?: number;
 }
 
+// Removed vibe from the expected response
 interface GroqActivityResponse {
   poiId?: number;
   title: string;
   description: string;
-  vibe: string;
 }
 
 export default function Home() {
@@ -93,8 +93,8 @@ export default function Home() {
   const removeFriend = (id: string) => setFriends(friends.filter((f) => f.id !== id))
 
   const generateActivities = async () => {
-    if (!location || friends.length === 0) {
-      setError('Please set a location and add at least one friend.')
+    if (!location || friends.length < 2) {
+      setError('Please set a location and add at least two friends.')
       return
     }
 
@@ -160,8 +160,9 @@ export default function Home() {
         {
           title: 'Local Café: Coffee Tasting',
           description: 'Explore artisanal coffee and pastries while chatting with friends',
-          vibe: 'Chill',
-          mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(city)}`
+          // Note: We don't need vibe here anymore, but keeping it empty is fine if app/type.ts still requires it
+          vibe: '',
+          mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('Local Cafe ' + city)}`
         }
       ]
     }
@@ -169,6 +170,7 @@ export default function Home() {
     const friendsText = friends.map((f) => `${f.name}:\n  Likes: ${f.likes}\n  Dislikes: ${f.dislikes || 'None'}`).join('\n\n')
     const poisText = pois.map((poi, index) => `[ID: ${index}] ${poi.name} (${poi.type})`).join('\n')
 
+    // Removed the "vibe" instruction from the prompt
     const prompt = `You are a local expert and social coordinator in ${city}. Here are 2-5 friends and their interests:
 
 ${friendsText}
@@ -186,13 +188,12 @@ The JSON format must be exactly:
     {
       "poiId": <Number from the ID field of the selected venue>,
       "title": "Short Activity Name",
-      "description": "Explain what you will do at this specific venue and why it satisfies the group's interests.",
-      "vibe": "Vibe tag (e.g., Chill, High Energy, Social, Adventurous)"
+      "description": "Explain what you will do at this specific venue and why it satisfies the group's interests."
     }
   ]
 }
 
-The last activity should have "vibe": "Wildcard". Return ONLY the JSON object, nothing else.`
+Return ONLY the JSON object, nothing else.`
 
     try {
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -223,13 +224,13 @@ The last activity should have "vibe": "Wildcard". Return ONLY the JSON object, n
         const poi = typeof activity.poiId === 'number' ? pois[activity.poiId] : null;
         
         const mapsUrl = poi 
-  ? `https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lon}`
-  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((activity.title || 'Activity') + ' near ' + city)}`;
+          ? `https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lon}`
+          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((activity.title || 'Activity') + ' near ' + city)}`;
 
         return {
           title: poi ? `${poi.name}: ${activity.title}` : activity.title,
           description: activity.description,
-          vibe: activity.vibe,
+          vibe: '', // Leaving empty since we stripped it from the UI
           isWildcard: index === parsedResponse.activities.length - 1,
           mapsUrl: mapsUrl
         }
@@ -240,12 +241,12 @@ The last activity should have "vibe": "Wildcard". Return ONLY the JSON object, n
   }
 
   return (
-    <main className="min-h-screen py-10 px-4 text-slate-200 selection:bg-blue-500/30">
+    <main className="min-h-screen py-16 px-4 selection:bg-beige selection:text-emerald-950">
       <div className="max-w-4xl mx-auto">
-        <Header location={location} onUpdateLocation={handleZipCodeSubmit} />
+        <Header location={location} onUpdateLocation={handleZipCodeSubmit} hideChangeLocation={!!activities} />
 
         {error && (
-          <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/30 text-rose-400 rounded-xl font-medium shadow-inner">
+          <div className="mb-8 p-6 bg-white border border-red-900 text-red-900 font-source-sans font-medium">
             {error}
           </div>
         )}
@@ -264,8 +265,8 @@ The last activity should have "vibe": "Wildcard". Return ONLY the JSON object, n
             />
             <button
               onClick={generateActivities}
-              disabled={!location || friends.length === 0}
-              className="w-full mt-6 py-4 px-6 bg-blue-600 text-white rounded-xl font-extrabold text-lg tracking-wide hover:bg-blue-500 shadow-[0_0_20px_rgba(37,99,235,0.4)] disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed transition-all"
+              disabled={!location || friends.length < 2}
+              className="w-full mt-8 py-5 px-6 bg-beige text-emerald-950 font-poppins font-bold text-lg tracking-widest uppercase hover:bg-beige-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Generate Activities
             </button>
