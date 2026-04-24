@@ -152,6 +152,27 @@ export default function Home() {
     }
   }
 
+  const getGoogleMapsPlaceUrl = async (name: string, lat: number, lon: number): Promise<string> => {
+    try {
+      const params = new URLSearchParams({
+        name,
+        lat: String(lat),
+        lon: String(lon),
+      })
+
+      const response = await fetch(`/api/google-place?${params.toString()}`)
+      const data = await response.json()
+
+      if (response.ok && data.url) {
+        return data.url
+      }
+    } catch (err) {
+      console.warn('Google Place lookup failed:', err)
+    }
+
+    return `https://www.google.com/maps/place/${lat},${lon}/@${lat},${lon},17z`
+  }
+
   const callGroqAPI = async (pois: POI[], friends: Friend[], city: string): Promise<Activity[]> => {
     const apiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY
 
@@ -220,21 +241,22 @@ Return ONLY the JSON object, nothing else.`
       const content = data.choices[0].message.content
       const parsedResponse = JSON.parse(content) as { activities: GroqActivityResponse[] }
 
-      return parsedResponse.activities.map((activity, index) => {
-        const poi = typeof activity.poiId === 'number' ? pois[activity.poiId] : null;
-        
-        const mapsUrl = poi 
-          ? `https://www.google.com/maps/search/?api=1&query=${poi.lat},${poi.lon}`
-          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((activity.title || 'Activity') + ' near ' + city)}`;
+      return await Promise.all(
+        parsedResponse.activities.map(async (activity, index) => {
+          const poi = typeof activity.poiId === 'number' ? pois[activity.poiId] : null
+          const mapsUrl = poi
+            ? await getGoogleMapsPlaceUrl(poi.name, poi.lat, poi.lon)
+            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((activity.title || 'Activity') + ' near ' + city)}`
 
-        return {
-          title: poi ? `${poi.name}: ${activity.title}` : activity.title,
-          description: activity.description,
-          vibe: '', // Leaving empty since we stripped it from the UI
-          isWildcard: index === parsedResponse.activities.length - 1,
-          mapsUrl: mapsUrl
-        }
-      })
+          return {
+            title: poi ? `${poi.name}: ${activity.title}` : activity.title,
+            description: activity.description,
+            vibe: '', // Leaving empty since we stripped it from the UI
+            isWildcard: index === parsedResponse.activities.length - 1,
+            mapsUrl: mapsUrl,
+          }
+        })
+      )
     } catch (err) {
       throw new Error(`${err instanceof Error ? err.message : 'Unknown error'}`)
     }

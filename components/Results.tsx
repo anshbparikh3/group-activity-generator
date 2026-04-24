@@ -14,7 +14,7 @@ export default function Results({ activities }: ResultsProps) {
 
       <div className="grid grid-cols-1 gap-8">
         {activities.map((activity, index) => {
-          const safeMapsUrl = activity.mapsUrl || `https://maps.google.com/?q=${encodeURIComponent(activity.title)}`
+          const safeMapsUrl = activity.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.title)}`
 
           return (
             <div
