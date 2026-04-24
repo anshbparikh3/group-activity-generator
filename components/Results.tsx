@@ -9,7 +9,7 @@ export default function Results({ activities }: ResultsProps) {
     <div className="space-y-8">
       <div className="mb-10 border-b border-emerald-800/50 pb-8">
         <h2 className="text-4xl font-poppins font-extrabold text-beige mb-3 tracking-tighter">Recommended Activities</h2>
-        <p className="text-zinc-300 font-source-sans text-lg">These results optimize your group’s interests</p>
+        <p className="text-zinc-300 font-source-sans text-lg">These results optimize your group&apos;s interests</p>
       </div>
 
       <div className="grid grid-cols-1 gap-8">
