@@ -19,12 +19,6 @@ interface OverpassElement {
 }
 
 // Removed vibe from the expected response
-interface GroqActivityResponse {
-  poiId?: number;
-  title: string;
-  description: string;
-}
-
 export default function Home() {
   const [location, setLocation] = useState<{ city: string; lat: number; lon: number } | null>(null)
   const [friends, setFriends] = useState<Friend[]>([])
@@ -49,6 +43,25 @@ export default function Home() {
 
     getLocationFromBrowser()
   }, [])
+
+  const fetchWithRetry = async (input: RequestInfo, init?: RequestInit, retries = 2): Promise<Response> => {
+    let attempt = 0
+    while (true) {
+      try {
+        const response = await fetch(input, init)
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`)
+        }
+        return response
+      } catch (error) {
+        if (attempt >= retries) {
+          throw error
+        }
+        attempt += 1
+        await new Promise((resolve) => setTimeout(resolve, 500 * attempt))
+      }
+    }
+  }
 
   const reverseGeocode = async (lat: number, lon: number) => {
     try {
@@ -130,11 +143,14 @@ export default function Home() {
         );
         out body;
       `
-      const response = await fetch('https://overpass-api.de/api/interpreter', {
+      const response = await fetchWithRetry('https://overpass-api.de/api/interpreter', {
         method: 'POST',
         body: overpassQuery,
       })
       const data = await response.json()
+      if (!data || !Array.isArray(data.elements)) {
+        throw new Error('Unexpected response from location service.')
+      }
       const pois: POI[] = data.elements
         .filter((element: OverpassElement) => element.tags && element.tags.name && element.lat && element.lon)
         .map((element: OverpassElement) => ({
@@ -148,118 +164,30 @@ export default function Home() {
       return pois
     } catch (err) {
       console.error('Failed to fetch POIs:', err)
-      return []
+      throw new Error('Failed to fetch nearby venues. Please try again.')
     }
-  }
-
-  const getGoogleMapsPlaceUrl = async (name: string, lat: number, lon: number): Promise<string> => {
-    try {
-      const params = new URLSearchParams({
-        name,
-        lat: String(lat),
-        lon: String(lon),
-      })
-
-      const response = await fetch(`/api/google-place?${params.toString()}`)
-      const data = await response.json()
-
-      if (response.ok && data.url) {
-        return data.url
-      }
-    } catch (err) {
-      console.warn('Google Place lookup failed:', err)
-    }
-
-    return `https://www.google.com/maps/place/${lat},${lon}/@${lat},${lon},17z`
   }
 
   const callGroqAPI = async (pois: POI[], friends: Friend[], city: string): Promise<Activity[]> => {
-    const apiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY
+    const response = await fetchWithRetry('/api/activities', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ pois, friends, city }),
+    })
 
-    if (!apiKey || apiKey === 'your_groq_api_key_here') {
-      return [
-        {
-          title: 'Local Café: Coffee Tasting',
-          description: 'Explore artisanal coffee and pastries while chatting with friends',
-          // Note: We don't need vibe here anymore, but keeping it empty is fine if app/type.ts still requires it
-          vibe: '',
-          mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('Local Cafe ' + city)}`
-        }
-      ]
+    const result = await response.json().catch(() => null)
+    if (!response.ok) {
+      const message = result?.error || `Activity generation failed (${response.status})`
+      throw new Error(message)
     }
 
-    const friendsText = friends.map((f) => `${f.name}:\n  Likes: ${f.likes}\n  Dislikes: ${f.dislikes || 'None'}`).join('\n\n')
-    const poisText = pois.map((poi, index) => `[ID: ${index}] ${poi.name} (${poi.type})`).join('\n')
-
-    // Removed the "vibe" instruction from the prompt
-    const prompt = `You are a local expert and social coordinator in ${city}. Here are 2-5 friends and their interests:
-
-${friendsText}
-
-Here are specific nearby venues in the area:
-${poisText}
-
-Your goal is to return ONLY a valid JSON object with exactly 4 recommendations: 3 based on group consensus and 1 'Wildcard' recommendation that is unexpected but fun.
-
-CRITICAL INSTRUCTION: You MUST select specific venues from the 'nearby venues' list provided above. Use the exact ID of the venue you selected. Do not make up venues.
-
-The JSON format must be exactly:
-{
-  "activities": [
-    {
-      "poiId": <Number from the ID field of the selected venue>,
-      "title": "Short Activity Name",
-      "description": "Explain what you will do at this specific venue and why it satisfies the group's interests."
+    if (!result || !Array.isArray(result)) {
+      throw new Error('Unexpected activity response from server.')
     }
-  ]
-}
 
-Return ONLY the JSON object, nothing else.`
-
-    try {
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'llama-3.1-8b-instant',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.7,
-          max_tokens: 1024,
-          response_format: { type: 'json_object' }
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({})) as { error?: { message?: string } };
-        throw new Error(errorData?.error?.message || `HTTP Error ${response.status}`);
-      }
-
-      const data = await response.json()
-      const content = data.choices[0].message.content
-      const parsedResponse = JSON.parse(content) as { activities: GroqActivityResponse[] }
-
-      return await Promise.all(
-        parsedResponse.activities.map(async (activity, index) => {
-          const poi = typeof activity.poiId === 'number' ? pois[activity.poiId] : null
-          const mapsUrl = poi
-            ? await getGoogleMapsPlaceUrl(poi.name, poi.lat, poi.lon)
-            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((activity.title || 'Activity') + ' near ' + city)}`
-
-          return {
-            title: poi ? `${poi.name}: ${activity.title}` : activity.title,
-            description: activity.description,
-            vibe: '', // Leaving empty since we stripped it from the UI
-            isWildcard: index === parsedResponse.activities.length - 1,
-            mapsUrl: mapsUrl,
-          }
-        })
-      )
-    } catch (err) {
-      throw new Error(`${err instanceof Error ? err.message : 'Unknown error'}`)
-    }
+    return result as Activity[]
   }
 
   return (
