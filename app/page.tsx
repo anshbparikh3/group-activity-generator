@@ -7,17 +7,6 @@ import Results from '@/components/Results'
 import LoadingState from '@/components/LoadingState'
 import { Friend, Activity, POI } from './type'
 
-interface OverpassElement {
-  tags?: {
-    name?: string;
-    amenity?: string;
-    leisure?: string;
-    shop?: string;
-  };
-  lat?: number;
-  lon?: number;
-}
-
 // Removed vibe from the expected response
 export default function Home() {
   const [location, setLocation] = useState<{ city: string; lat: number; lon: number } | null>(null)
@@ -127,41 +116,19 @@ export default function Home() {
 
   const fetchNearbyPOIs = async (lat: number, lon: number): Promise<POI[]> => {
     try {
-      const overpassQuery = `
-        [out:json];
-        (
-          node[amenity=cafe](around:8000,${lat},${lon});
-          node[amenity=restaurant](around:8000,${lat},${lon});
-          node[leisure=park](around:8000,${lat},${lon});
-          node[amenity=museum](around:8000,${lat},${lon});
-          node[amenity=bar](around:8000,${lat},${lon});
-          node[shop=books](around:8000,${lat},${lon});
-          node[amenity=cinema](around:8000,${lat},${lon});
-          node[amenity=gym](around:8000,${lat},${lon});
-          node[leisure=bowling_alley](around:8000,${lat},${lon});
-          node[leisure=sports_centre](around:8000,${lat},${lon});
-        );
-        out body;
-      `
-      const response = await fetchWithRetry('https://overpass-api.de/api/interpreter', {
-        method: 'POST',
-        body: overpassQuery,
-      })
+      const response = await fetchWithRetry(`/api/nearby-pois?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`)
       const data = await response.json()
-      if (!data || !Array.isArray(data.elements)) {
-        throw new Error('Unexpected response from location service.')
+
+      if (!response.ok) {
+        const message = data?.error || 'Failed to fetch nearby venues.'
+        throw new Error(message)
       }
-      const pois: POI[] = data.elements
-        .filter((element: OverpassElement) => element.tags && element.tags.name && element.lat && element.lon)
-        .map((element: OverpassElement) => ({
-          name: element.tags!.name!,
-          type: element.tags!.amenity || element.tags!.leisure || element.tags!.shop || 'venue',
-          lat: element.lat!,
-          lon: element.lon!
-        }))
-        .filter((poi: POI, index: number, self: POI[]) => index === self.findIndex((t) => t.name === poi.name))
-        .slice(0, 30)
-      return pois
+
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid nearby venues response.')
+      }
+
+      return data as POI[]
     } catch (err) {
       console.error('Failed to fetch POIs:', err)
       throw new Error('Failed to fetch nearby venues. Please try again.')
