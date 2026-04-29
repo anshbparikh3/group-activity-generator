@@ -27,7 +27,7 @@ export default function Header({ location, onUpdateLocation, hideChangeLocation 
 
   return (
     <header className="mb-12 bg-white border border-zinc-200 p-10">
-      <h1 className="text-5xl sm:text-6xl font-poppins font-extrabold mb-4 text-emerald-950 tracking-tighter">
+      <h1 className="text-5xl sm:text-6xl font-source-sans font-extrabold mb-4 text-emerald-950 tracking-tighter">
         Group Activity Generator
       </h1>
       <p className="text-zinc-500 mb-10 font-medium font-source-sans text-lg">Can’t decide what to do with your friends? Ask us!</p>

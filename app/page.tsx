@@ -131,7 +131,7 @@ export default function Home() {
       return data as POI[]
     } catch (err) {
       console.error('Failed to fetch POIs:', err)
-      throw new Error('Failed to fetch nearby venues. Please try again.')
+      throw new Error(err instanceof Error ? err.message : 'Failed to fetch nearby venues. Please try again.')
     }
   }
 

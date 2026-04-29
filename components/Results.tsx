@@ -49,7 +49,7 @@ export default function Results({ activities }: ResultsProps) {
                   className={`inline-flex items-center flex-shrink-0 px-6 py-3 font-poppins text-xs font-bold uppercase tracking-widest transition-colors border ${
                     activity.isWildcard
                       ? 'bg-emerald-950 text-beige border-emerald-950 hover:bg-emerald-900'
-                      : 'bg-white text-emerald-950 border-zinc-300 hover:bg-emerald-900/10'
+                      : 'bg-emerald-900/10 text-emerald-950 border-emerald-900/20 hover:bg-beige-dark'
                   }`}
                 >
                   Open in Google Maps

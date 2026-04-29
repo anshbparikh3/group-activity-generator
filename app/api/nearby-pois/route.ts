@@ -41,6 +41,11 @@ out body;
   try {
     const response = await fetch('https://overpass-api.de/api/interpreter', {
       method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain',
+        'Accept': 'application/json',
+        'User-Agent': 'Commvault/1.0 (https://example.com)',
+      },
       body: overpassQuery,
     })
 
